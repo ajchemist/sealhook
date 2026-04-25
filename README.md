@@ -52,6 +52,17 @@ On macOS with Homebrew:
 brew install age rust prek
 ```
 
+## Install
+
+After the crate is published to crates.io:
+
+```bash
+cargo install sealhook
+```
+
+`sealhook` still requires the system `age` CLI at runtime, so install `age`
+through your platform package manager as well.
+
 ## Verify
 
 ```bash

@@ -2,6 +2,13 @@
 name = "sealhook"
 version = "0.1.0"
 edition = "2021"
+description = "Git-hook utility for syncing local plaintext secrets with age-encrypted Git artifacts"
+license = "MIT"
+repository = "https://github.com/ajchemist/sealhook"
+homepage = "https://github.com/ajchemist/sealhook"
+readme = "README.md"
+keywords = ["age", "git-hooks", "secrets", "encryption", "cli"]
+categories = ["command-line-utilities", "cryptography"]
 
 [dependencies]
 anyhow = "1"
