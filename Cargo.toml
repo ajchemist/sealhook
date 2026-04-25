@@ -1,9 +1,9 @@
 [package]
 name = "sealhook"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Git-hook utility for syncing local plaintext secrets with age-encrypted Git artifacts"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/ajchemist/sealhook"
 homepage = "https://github.com/ajchemist/sealhook"
 readme = "README.md"

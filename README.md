@@ -54,8 +54,6 @@ brew install age rust prek
 
 ## Install
 
-After the crate is published to crates.io:
-
 ```bash
 cargo install sealhook
 ```
@@ -262,3 +260,12 @@ orchestration tool:
 
 This keeps the project focused: Rust for fast/robust repo automation, and `age`
 for cryptography.
+
+## License
+
+Licensed under either of:
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
