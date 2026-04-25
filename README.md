@@ -247,6 +247,29 @@ Important: Git does not activate hooks just because a hook config exists in the
 repository. Each clone still needs a bootstrap/install step such as the `prek
 install` command above.
 
+Test the configured hooks manually before relying on them:
+
+```bash
+prek run --all-files
+```
+
+Expected output for the pre-commit hooks looks like this:
+
+```text
+Encrypt changed secrets..................................................Passed
+Block staged plaintext secrets...........................................Passed
+```
+
+When committing, the same pre-commit hooks should run automatically before Git
+creates the commit:
+
+```text
+$ git commit -m "Update profile secrets"
+Encrypt changed secrets..................................................Passed
+Block staged plaintext secrets...........................................Passed
+[main 1234567] Update profile secrets
+```
+
 ## Design notes
 
 `sealhook` is intentionally not a secret format. It is a synchronization and hook
