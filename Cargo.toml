@@ -1,6 +1,6 @@
 [package]
 name = "sealhook"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Git-hook utility for syncing local plaintext secrets with age-encrypted Git artifacts"
 license = "MIT OR Apache-2.0"
@@ -16,6 +16,7 @@ clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 filetime = "0.2"
+globset = "0.4"
 
 [dev-dependencies]
 assert_cmd = "2"

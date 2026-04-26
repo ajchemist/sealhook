@@ -62,7 +62,7 @@ path = "secret.txt"
 fn status_reports_default_encrypted_path() {
     let dir = tempdir().unwrap();
     write_minimal_config(dir.path());
-    fs::write(dir.path().join(".env"), "TOKEN=example\n").unwrap();
+    fs::write(dir.path().join(".env"), "TOKEN=example").unwrap();
 
     let mut cmd = Command::cargo_bin("sealhook").unwrap();
     cmd.current_dir(dir.path())
@@ -70,6 +70,41 @@ fn status_reports_default_encrypted_path() {
         .assert()
         .failure()
         .stdout(predicate::str::contains("needs encrypt: .env -> .env.age"));
+}
+
+#[test]
+fn status_expands_secret_patterns_for_plaintext_and_encrypted_files() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join(".sealhook.toml"),
+        r#"[sealhook]
+engine = "age"
+
+[[secrets]]
+pattern = "config/**/*.env"
+"#,
+    )
+    .unwrap();
+    fs::create_dir_all(dir.path().join("config/service-a")).unwrap();
+    fs::create_dir_all(dir.path().join("config/service-b")).unwrap();
+    fs::write(dir.path().join("config/service-a/.env"), "TOKEN=a").unwrap();
+    fs::write(
+        dir.path().join("config/service-b/.env.age"),
+        "AGE-ENCRYPTED",
+    )
+    .unwrap();
+
+    let mut cmd = Command::cargo_bin("sealhook").unwrap();
+    cmd.current_dir(dir.path())
+        .arg("status")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "needs encrypt: config/service-a/.env -> config/service-a/.env.age",
+        ))
+        .stdout(predicate::str::contains(
+            "needs decrypt: config/service-b/.env.age -> config/service-b/.env",
+        ));
 }
 
 #[test]

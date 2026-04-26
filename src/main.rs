@@ -1,7 +1,8 @@
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
+use globset::{Glob, GlobSetBuilder};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -59,7 +60,8 @@ struct AgeSection {
 
 #[derive(Debug, Deserialize)]
 struct SecretSection {
-    path: String,
+    path: Option<String>,
+    pattern: Option<String>,
     encrypted: Option<String>,
     mode: Option<String>,
 }
@@ -158,25 +160,17 @@ fn load_config(path: &Path) -> Result<Config> {
         armor: age.armor.unwrap_or(false),
     };
 
-    let mut secrets = Vec::new();
+    let mut secrets = BTreeMap::new();
+    let has_secret_entries = !parsed.secrets.is_empty();
     for secret in parsed.secrets {
-        let encrypted = secret
-            .encrypted
-            .unwrap_or_else(|| format!("{}.age", secret.path));
-        let mode = match secret.mode {
-            Some(m) => u32::from_str_radix(m.trim_start_matches("0o"), 8)
-                .with_context(|| format!("invalid mode for {}", secret.path))?,
-            None => 0o600,
-        };
-        secrets.push(Secret {
-            path: secret.path,
-            encrypted,
-            mode,
-        });
+        for expanded in expand_secret_section(secret, &base)? {
+            secrets.insert(expanded.path.clone(), expanded);
+        }
     }
-    if secrets.is_empty() {
+    if !has_secret_entries {
         bail!("no [[secrets]] entries configured");
     }
+    let secrets = secrets.into_values().collect();
 
     Ok(Config {
         base,
@@ -184,6 +178,106 @@ fn load_config(path: &Path) -> Result<Config> {
         age,
         secrets,
     })
+}
+
+fn expand_secret_section(secret: SecretSection, base: &Path) -> Result<Vec<Secret>> {
+    let mode = parse_mode(
+        secret.mode.as_deref(),
+        secret.path.as_deref().or(secret.pattern.as_deref()),
+    )?;
+    match (secret.path, secret.pattern) {
+        (Some(path), None) => {
+            let encrypted = secret.encrypted.unwrap_or_else(|| format!("{path}.age"));
+            Ok(vec![Secret {
+                path,
+                encrypted,
+                mode,
+            }])
+        }
+        (None, Some(pattern)) => {
+            if secret.encrypted.is_some() {
+                bail!("[[secrets]] entries with pattern cannot set encrypted; encrypted path defaults to <path>.age");
+            }
+            expand_secret_pattern(&pattern, base, mode)
+        }
+        (Some(_), Some(_)) => {
+            bail!("[[secrets]] entries must set either path or pattern, not both")
+        }
+        (None, None) => bail!("[[secrets]] entries must set path or pattern"),
+    }
+}
+
+fn parse_mode(mode: Option<&str>, label: Option<&str>) -> Result<u32> {
+    match mode {
+        Some(m) => u32::from_str_radix(m.trim_start_matches("0o"), 8)
+            .with_context(|| format!("invalid mode for {}", label.unwrap_or("secret"))),
+        None => Ok(0o600),
+    }
+}
+
+fn expand_secret_pattern(pattern: &str, base: &Path, mode: u32) -> Result<Vec<Secret>> {
+    let mut builder = GlobSetBuilder::new();
+    builder.add(Glob::new(pattern).with_context(|| format!("invalid secret pattern: {pattern}"))?);
+    let matcher = builder.build()?;
+
+    let mut secrets = BTreeMap::new();
+    for file in collect_files(base)? {
+        let rel = relative_slash_path(&file, base)?;
+        if matcher.is_match(&rel) {
+            secrets.insert(
+                rel.clone(),
+                Secret {
+                    path: rel.clone(),
+                    encrypted: format!("{rel}.age"),
+                    mode,
+                },
+            );
+        }
+        if let Some(plain) = rel.strip_suffix(".age") {
+            if matcher.is_match(plain) {
+                secrets.insert(
+                    plain.to_string(),
+                    Secret {
+                        path: plain.to_string(),
+                        encrypted: rel,
+                        mode,
+                    },
+                );
+            }
+        }
+    }
+    Ok(secrets.into_values().collect())
+}
+
+fn collect_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    collect_files_into(dir, &mut files)?;
+    Ok(files)
+}
+
+fn collect_files_into(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("read directory {}", dir.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            if entry.file_name() == ".git" {
+                continue;
+            }
+            collect_files_into(&path, files)?;
+        } else if file_type.is_file() {
+            files.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn relative_slash_path(path: &Path, base: &Path) -> Result<String> {
+    Ok(path
+        .strip_prefix(base)
+        .with_context(|| format!("make {} relative to {}", path.display(), base.display()))?
+        .to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/"))
 }
 
 fn encrypt(cfg: &Config, force: bool, stage: bool) -> Result<i32> {

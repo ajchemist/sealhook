@@ -93,6 +93,7 @@ Defaults:
 - identity files: `~/.config/age/keys.txt`, `~/.config/age/se.key`
 - armor: `false`
 - encrypted path: `<path>.age`
+- pattern entries: `pattern = "config/**/*.env"` expands matching plaintext files and existing `<path>.age` files
 - plaintext mode after decrypt: `0600`
 
 Expanded example:
@@ -114,6 +115,12 @@ mode = "0600"
 [[secrets]]
 path = "config/local-secrets.json"
 # encrypted defaults to "config/local-secrets.json.age"
+
+[[secrets]]
+pattern = "config/**/*.env"
+# Each matched plaintext file encrypts to "<path>.age".
+# Existing "<path>.age" files are also recognized so decrypt can recreate missing plaintext files.
+# `encrypted = ...` is intentionally unsupported for pattern entries because one pattern can match many files.
 ```
 
 `.age-recipients` should contain one age recipient per line:
